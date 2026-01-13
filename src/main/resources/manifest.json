@@ -1,0 +1,19 @@
+{
+  "Group": "gg.paynow",
+  "Name": "PayNow",
+  "Version": "1.0.0",
+  "Description": "Official PayNow plugin for Hytale",
+  "Authors": [
+    {
+      "Name": "paynow",
+      "Email": "your.email@example.com",
+      "Url": "https://paynow.gg/"
+    }
+  ],
+  "Website": "https://paynow.gg/",
+  "Main": "gg.paynow.paynowhytale.PayNowHytale",
+  "ServerVersion": "*",
+  "Dependencies": {},
+  "OptionalDependencies": {},
+  "DisabledByDefault": false
+}

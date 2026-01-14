@@ -12,7 +12,7 @@ public class QueuedCommand {
     @SerializedName("customer_name")
     private String customerName;
 
-    @SerializedName("minecraft_uuid")
+    @SerializedName("hytale_uuid")
     private UUID customerUUID;
 
     private String command;

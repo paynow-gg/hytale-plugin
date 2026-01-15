@@ -6,16 +6,13 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.util.Config;
 import gg.paynow.paynowhytale.core.PayNowLib;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class PayNowHytale extends JavaPlugin {
 
@@ -25,17 +22,20 @@ public class PayNowHytale extends JavaPlugin {
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> currentTask;
 
+    private final Config<PayNowConfig> config;
+
     public PayNowHytale(JavaPluginInit init) {
         super(init);
         instance = this;
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
         System.out.println("[PayNow] Plugin loaded!");
-
+        this.config = this.withConfig(PayNowConfig.CODEC);
     }
 
     @Override
     protected void setup() {
-        File configFile = getConfigFile();
+        // Create the config if it doesn't exist
+        this.config.save().thenAcceptAsync(_ -> {});
 
         // TODO: Change IP parameter
         this.payNowLib = new PayNowLib(command -> {
@@ -43,11 +43,7 @@ public class PayNowHytale extends JavaPlugin {
             return true;
         }, "Hytale Server", HytaleServer.get().getConfig().getMotd());
         this.payNowLib.setLogCallback((s, level) -> this.getLogger().at(level).log(s));
-        this.payNowLib.loadPayNowConfig(configFile);
 
-        // Register command
-
-        this.payNowLib.onUpdateConfig(_ -> this.startRunnable());
         this.startRunnable();
 
         this.getCommandRegistry().registerCommand(new PayNowCommand());
@@ -66,20 +62,17 @@ public class PayNowHytale extends JavaPlugin {
                 onlinePlayersUUIDs.add(player.getUuid());
             }
             this.payNowLib.fetchPendingCommands(onlinePlayersNames, onlinePlayersUUIDs);
-        }, 0, this.payNowLib.getConfig().getApiCheckInterval(), TimeUnit.SECONDS);
+        }, 0, this.config.get().getApiCheckInterval(), TimeUnit.SECONDS);
     }
 
     public void triggerConfigUpdate(){
-        this.payNowLib.savePayNowConfig(this.getConfigFile());
-        this.payNowLib.updateConfig();
+        this.config.save().thenAcceptAsync(_ -> {});
+        this.payNowLib.linkToken();
+        this.startRunnable();
     }
 
-    private File getConfigFile() {
-        return new File(new File(this.getDataDirectory().toUri()), "config.yml");
-    }
-
-    public PayNowLib getPayNowLib() {
-        return payNowLib;
+    public Config<PayNowConfig> getConfig() {
+        return config;
     }
 
     public static PayNowHytale getInstance() {

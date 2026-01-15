@@ -17,7 +17,7 @@ public class PayNowCommand extends AbstractCommandCollection {
         this.addSubCommand(new LinkCommand());
     }
 
-    private class LinkCommand extends CommandBase {
+    private static class LinkCommand extends CommandBase {
         private final RequiredArg<String> tokenArg;
 
         private final PayNowHytale payNowHytale = PayNowHytale.getInstance();
@@ -30,7 +30,7 @@ public class PayNowCommand extends AbstractCommandCollection {
         @Override
         protected void executeSync(@NotNull CommandContext ctx) {
             CommandUtil.requirePermission(ctx.sender(), HytalePermissions.fromCommand("paynow.admin"));
-            this.payNowHytale.getPayNowLib().getConfig().setApiToken(this.tokenArg.get(ctx));
+            this.payNowHytale.getConfig().get().setApiToken(this.tokenArg.get(ctx));
             this.payNowHytale.triggerConfigUpdate();
             ctx.sendMessage(Message.raw("API token updated"));
         }

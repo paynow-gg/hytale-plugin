@@ -1,6 +1,7 @@
 package gg.paynow.paynowhytale.core;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import gg.paynow.paynowhytale.PayNowConfig;
@@ -8,6 +9,7 @@ import gg.paynow.paynowhytale.PayNowHytale;
 import gg.paynow.paynowhytale.core.dto.CommandAttempt;
 import gg.paynow.paynowhytale.core.dto.LinkRequest;
 import gg.paynow.paynowhytale.core.dto.PlayerList;
+import gg.paynow.paynowhytale.core.events.PayNowEvent;
 
 import java.io.*;
 import java.net.URI;
@@ -15,8 +17,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -27,9 +31,12 @@ public class PayNowLib {
 
     private static final URI API_QUEUE_URL = URI.create("https://api.paynow.gg/v1/delivery/command-queue/");
     private static final URI API_LINK_URL = URI.create("https://api.paynow.gg/v1/delivery/gameserver/link");
+    private static final URI API_EVENTS_URL = URI.create("https://api.paynow.gg/v1/delivery/events");
 
     private final CommandHistory executedCommands;
     private final List<String> successfulCommands;
+
+    private final ConcurrentLinkedQueue<PayNowEvent> eventQueue;
 
     private final Function<String, Boolean> executeCommandCallback;
     
@@ -44,6 +51,7 @@ public class PayNowLib {
         this.executeCommandCallback = executeCommandCallback;
         this.executedCommands = new CommandHistory(25);
         this.successfulCommands = new ArrayList<>();
+        this.eventQueue = new ConcurrentLinkedQueue<>();
 
         this.ip = ip;
         this.motd = motd;
@@ -234,6 +242,67 @@ public class PayNowLib {
 
         this.log("Successfully connected to PayNow using the token for \"" + gsName + "\" (" + gsId + ")");
     }
+
+    public void registerEvent(PayNowEvent event) {
+        this.eventQueue.add(event);
+    }
+
+    public void reportEvents() {
+        if(this.eventQueue.isEmpty()) return;
+
+        String apiToken = this.getConfig().getApiToken();
+        if(apiToken == null) {
+            this.warn("API Token is not set");
+            return;
+        }
+
+        Gson gson = new GsonBuilder().registerTypeAdapter(PayNowEvent.class, new PayNowEvent.PayNowEventAdapter()).create();
+
+        // Atomically drain all events from the queue
+        List<PayNowEvent> eventsToReport = new ArrayList<>();
+        PayNowEvent event;
+        while ((event = this.eventQueue.poll()) != null) {
+            eventsToReport.add(event);
+        }
+
+        if(eventsToReport.isEmpty()) return;
+
+        String requestJson = gson.toJson(eventsToReport);
+
+        this.debug(requestJson);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(API_EVENTS_URL)
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Gameserver " + apiToken)
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestJson))
+                .build();
+
+        // Execute the HTTP request asynchronously
+        PayNowUtils.ASYNC_EXEC.submit(() -> {
+            try {
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                int statusCode = response.statusCode();
+                if(!PayNowUtils.isSuccess(statusCode)) {
+                    this.warn("Failed to report events: " + statusCode);
+                    // Re-add events to the front of the queue if failed to report
+                    eventsToReport.forEach(this.eventQueue::offer);
+                } else {
+                    this.debug("Successfully reported " + eventsToReport.size() + " events");
+                }
+            } catch (IOException | InterruptedException ex) {
+                severe("Failed to report events: " + ex.getMessage());
+                debug(Arrays.toString(ex.getStackTrace()));
+                // Re-add events to the queue if failed to report
+                eventsToReport.forEach(this.eventQueue::offer);
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+    }
+
 
     private String formatPlayers(List<String> names, List<UUID> uuids) {
         Gson gson = new Gson();

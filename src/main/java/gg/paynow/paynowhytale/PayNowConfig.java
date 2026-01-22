@@ -9,11 +9,14 @@ public class PayNowConfig {
             .append(new KeyedCodec<>("API token", Codec.STRING, true), PayNowConfig::setApiToken, PayNowConfig::getApiToken).add()
             .append(new KeyedCodec<>("Check interval", Codec.INTEGER), PayNowConfig::setApiCheckInterval, PayNowConfig::getApiCheckInterval).add()
             .append(new KeyedCodec<>("Log command executions", Codec.BOOLEAN), PayNowConfig::setLogCommandExecutions, PayNowConfig::doesLogCommandExecutions).add()
+            .append(new KeyedCodec<>("Events queue report interval", Codec.INTEGER), PayNowConfig::setEventsQueueReportInterval, PayNowConfig::getEventsQueueReportInterval).add()
             .append(new KeyedCodec<>("Debug", Codec.BOOLEAN), PayNowConfig::setDebug, PayNowConfig::isDebug).add().build();
 
     private String apiToken = "";
 
     private int apiCheckInterval = 10;
+
+    private int eventsQueueReportInterval = 10;
 
     private boolean logCommandExecutions = true;
 
@@ -29,12 +32,20 @@ public class PayNowConfig {
         return apiCheckInterval;
     }
 
+    public int getEventsQueueReportInterval() {
+        return eventsQueueReportInterval;
+    }
+
     public boolean doesLogCommandExecutions() {
         return logCommandExecutions;
     }
 
     public void setApiCheckInterval(int apiCheckInterval) {
         this.apiCheckInterval = apiCheckInterval;
+    }
+
+    public void setEventsQueueReportInterval(int eventsQueueReportInterval) {
+        this.eventsQueueReportInterval = eventsQueueReportInterval;
     }
 
     public void setLogCommandExecutions(boolean logCommandExecutions) {

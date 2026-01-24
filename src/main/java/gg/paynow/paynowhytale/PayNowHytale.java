@@ -44,10 +44,11 @@ public class PayNowHytale extends JavaPlugin {
         this.config.save().thenAcceptAsync(_ -> {});
 
         // TODO: Change IP parameter
+        String motd = HytaleServer.get().getConfig().getMotd();
         this.payNowLib = new PayNowLib(command -> {
             HytaleServer.get().getCommandManager().handleCommand(ConsoleSender.INSTANCE, command);
             return true;
-        }, "Hytale Server", HytaleServer.get().getConfig().getMotd());
+        }, "127.0.0.1", motd == null ? "Hytale Server" : motd);
         this.payNowLib.setLogCallback((s, level) -> this.getLogger().at(level).log(s));
 
         this.startRunnable();
